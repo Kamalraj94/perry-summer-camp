@@ -7,6 +7,10 @@ import com.jayway.restassured.specification.RequestSpecification;
 import com.jayway.restassured.RestAssured;
 import junit.framework.Assert;
 import java.io.IOException;
+import java.util.HashMap;
+import static org.hamcrest.Matchers.equalTo;
+import java.util.Map;
+
 import org.json.JSONObject;
 
 import static com.jayway.restassured.RestAssured.given;
@@ -20,7 +24,6 @@ public class ApiRequests {
 
 	public ApiRequests() throws IOException {
 		 config = new ConfigFileReader();
-		request = RestAssured.given();
 	}
 	
 	 private RequestSpecification request;
@@ -40,14 +43,28 @@ public class ApiRequests {
 
 	public void postRequestforUsers(String name , String uuid){
 		endPointUrl = config.getURL()+config.postUrlForId();
-		request.put("name",name);
-		request.put("id",uuid);
-		response = request.post(endPointUrl);
+		Map<String, Object> jsonPayload = new HashMap<>();
+		jsonPayload.put("name", name);
+		jsonPayload.put("id", uuid);
+		Response response =
+				RestAssured.given()
+						.contentType(ContentType.JSON)
+						.body(jsonPayload)
+						.when()
+						.post("/posts")
+						.then()
+						.assertThat()
+						.statusCode(201)
+						.body("name", equalTo(name))
+						.body("id", equalTo(uuid))
+						.extract()
+						.response();
 		Assert.assertEquals(response.getStatusCode(),201);
 	}
 
 	public void postRequestforSendingMessage(String fromUserId , String toUserId ,String messageContent,String uuid){
-		endPointUrl = config.getURL()+config.postRequestForSendingMessage();
+		endPointUrl  = config.getURL()+config.postRequestForSendingMessage();
+		request = RestAssured.given();
 		request.put("from", new JSONObject().put("id", fromUserId.toString()));
 		request.put("to", new JSONObject().put("id", toUserId.toString()));
 		request.put("message", messageContent);
@@ -59,10 +76,10 @@ public class ApiRequests {
 
 	public String getMessageDetails(String fromId , String toId){
 		endPointUrl = config.getURL()+config.getRequestForMessageValidation();
-		response = given().queryParam("from", fromId)
+		response = RestAssured.given().queryParam("from", fromId)
 				.queryParam("to", toId)
 				.when()
-				.get("/message")
+				.get(endPointUrl)
 				.then()
 				.statusCode(200)
 				.extract()
@@ -73,6 +90,7 @@ public class ApiRequests {
 
 	public void updateMessageDetails(String uuid,String messageContent){
 		endPointUrl = config.getURL()+config.putRequestForMessageValidation()+uuid;
+		request = RestAssured.given();
 		request.put("message", messageContent);
 		response = request.put(endPointUrl);
 		Assert.assertEquals(response.getStatusCode(),201);
@@ -80,13 +98,14 @@ public class ApiRequests {
 
 	public String getUpdatedMessageDetails(String uuid){
 		endPointUrl = config.getURL()+config.getRequestForMessageValidation()+uuid;
-		response = request.get(endPointUrl);
+		response = RestAssured.get(endPointUrl).then().contentType(ContentType.JSON).extract().response();
 		Assert.assertEquals(response.getStatusCode(),201);
 		return json.getString("message");
 	}
 
 	public void deleteMessageDetails(String uuid){
 		endPointUrl = config.getURL()+config.getRequestForMessageValidation()+uuid;
+		request = RestAssured.given();
 		response = request.delete(endPointUrl);
 		Assert.assertEquals(response.getStatusCode(),204);
 	}
